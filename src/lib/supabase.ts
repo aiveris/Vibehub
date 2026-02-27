@@ -4,8 +4,41 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder'
 
 // Exporting a singleton client
-// In a real app, you'd use the provided URL and Key
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+export type Tool = {
+    id: string;
+    pavadinimas: string;
+    aprasymas: string;
+    url_nuoroda: string;
+    created_at?: string;
+}
+
+export const getTools = async () => {
+    const { data, error } = await supabase
+        .from('tools')
+        .select('*')
+        .order('created_at', { ascending: false });
+    
+    if (error) {
+        console.error('Error fetching tools:', error);
+        return [];
+    }
+    return data as Tool[];
+}
+
+export const addTool = async (tool: Omit<Tool, 'id' | 'created_at'>) => {
+    const { data, error } = await supabase
+        .from('tools')
+        .insert([tool])
+        .select();
+    
+    if (error) {
+        console.error('Error adding tool:', error);
+        throw error;
+    }
+    return data[0] as Tool;
+}
 
 // Mock data for development when Supabase is not configured
 export const getMockPrompts = () => [
