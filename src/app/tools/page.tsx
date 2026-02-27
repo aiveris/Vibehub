@@ -1,61 +1,66 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Wrench, Plus, ExternalLink, Lightbulb, User, Link as LinkIcon } from "lucide-react";
-import { getMockTools } from "@/lib/supabase";
+import { Wrench, Plus, ExternalLink, Lightbulb, Link as LinkIcon } from "lucide-react";
+import { getTools, addTool, type Tool } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
-interface Tool {
-    id: string;
-    title: string;
-    description: string;
-    url: string;
-}
-
-interface Advice {
-    slip: {
-        id: number;
-        advice: string;
-    };
+interface JokeResponse {
+    joke?: string;
+    setup?: string;
+    delivery?: string;
+    type: "single" | "twopart";
 }
 
 export default function ToolsPage() {
     const [tools, setTools] = useState<Tool[]>([]);
-    const [advice, setAdvice] = useState<string>("");
+    const [joke, setJoke] = useState<string>("");
     const [isFormOpen, setIsFormOpen] = useState(false);
-    const [newTool, setNewTool] = useState({ title: "", description: "", url: "" });
-    const [loadingAdvice, setLoadingAdvice] = useState(true);
+    const [newTool, setNewTool] = useState({ pavadinimas: "", aprasymas: "", url_nuoroda: "" });
+    const [loadingJoke, setLoadingJoke] = useState(true);
+    const [loadingTools, setLoadingTools] = useState(true);
 
     useEffect(() => {
-        setTools(getMockTools());
-        fetchAdvice();
+        fetchTools();
+        fetchJoke();
     }, []);
 
-    const fetchAdvice = async () => {
-        setLoadingAdvice(true);
+    const fetchTools = async () => {
+        setLoadingTools(true);
+        const data = await getTools();
+        setTools(data);
+        setLoadingTools(false);
+    };
+
+    const fetchJoke = async () => {
+        setLoadingJoke(true);
         try {
-            const res = await fetch("https://api.adviceslip.com/advice");
-            const data: Advice = await res.json();
-            setAdvice(data.slip.advice);
+            const res = await fetch("https://v2.jokeapi.dev/joke/Programming?type=single");
+            const data: JokeResponse = await res.json();
+            if (data.type === "single") {
+                setJoke(data.joke || "");
+            } else {
+                setJoke(`${data.setup} ... ${data.delivery}`);
+            }
         } catch (error) {
-            setAdvice("Klaida užkraunant patarimą. Bet štai vienas: visada daryk commit'us dažnai!");
+            setJoke("Klaida užkraunant juokelį. Bet štai vienas: kodėl programuotojai nekenčia gamtos? Per daug bug'ų.");
         } finally {
-            setLoadingAdvice(false);
+            setLoadingJoke(false);
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newTool.title || !newTool.url) return;
+        if (!newTool.pavadinimas || !newTool.url_nuoroda) return;
 
-        const tool: Tool = {
-            id: Math.random().toString(36).substr(2, 9),
-            ...newTool,
-        };
-
-        setTools([tool, ...tools]);
-        setNewTool({ title: "", description: "", url: "" });
-        setIsFormOpen(false);
+        try {
+            await addTool(newTool);
+            setNewTool({ pavadinimas: "", aprasymas: "", url_nuoroda: "" });
+            setIsFormOpen(false);
+            fetchTools(); // Refresh list
+        } catch (error) {
+            alert("Nepavyko išsaugoti įrankio.");
+        }
     };
 
     return (
@@ -83,7 +88,7 @@ export default function ToolsPage() {
                 </button>
             </div>
 
-            {/* Advice Section */}
+            {/* Joke Section */}
             <div className="glass p-8 rounded-[2rem] bg-gradient-to-br from-accent/10 to-primary/10 border-accent/20 relative overflow-hidden group">
                 <div className="absolute -right-4 -top-4 w-24 h-24 bg-accent/20 blur-3xl rounded-full" />
                 <div className="relative z-10 flex items-start gap-4">
@@ -91,9 +96,9 @@ export default function ToolsPage() {
                         <Lightbulb className="w-6 h-6 animate-pulse" />
                     </div>
                     <div className="space-y-1">
-                        <h4 className="text-sm font-bold uppercase tracking-wider text-accent/80">Programuotojo Patarimas</h4>
+                        <h4 className="text-sm font-bold uppercase tracking-wider text-accent/80">Programuotojo Juokelis</h4>
                         <p className="text-lg font-medium italic leading-relaxed">
-                            {loadingAdvice ? "Ieškoma išminties..." : `"${advice}"`}
+                            {loadingJoke ? "Ieškoma juoko..." : `"${joke}"`}
                         </p>
                     </div>
                 </div>
@@ -109,9 +114,9 @@ export default function ToolsPage() {
                             <label className="text-sm font-medium text-muted">Pavadinimas</label>
                             <input
                                 type="text"
-                                value={newTool.title}
+                                value={newTool.pavadinimas}
                                 onChange={(e) =>
-                                    setNewTool({ ...newTool, title: e.target.value })
+                                    setNewTool({ ...newTool, pavadinimas: e.target.value })
                                 }
                                 placeholder="Pvz: Tailwind UI"
                                 className="w-full bg-background border border-border rounded-xl px-4 py-2 focus:ring-2 focus:ring-accent outline-none transition-all"
@@ -122,9 +127,9 @@ export default function ToolsPage() {
                             <label className="text-sm font-medium text-muted">URL Adresas</label>
                             <input
                                 type="url"
-                                value={newTool.url}
+                                value={newTool.url_nuoroda}
                                 onChange={(e) =>
-                                    setNewTool({ ...newTool, url: e.target.value })
+                                    setNewTool({ ...newTool, url_nuoroda: e.target.value })
                                 }
                                 placeholder="https://..."
                                 className="w-full bg-background border border-border rounded-xl px-4 py-2 focus:ring-2 focus:ring-accent outline-none transition-all"
@@ -135,9 +140,9 @@ export default function ToolsPage() {
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-muted">Aprašymas</label>
                         <textarea
-                            value={newTool.description}
+                            value={newTool.aprasymas}
                             onChange={(e) =>
-                                setNewTool({ ...newTool, description: e.target.value })
+                                setNewTool({ ...newTool, aprasymas: e.target.value })
                             }
                             placeholder="Trumpai apibūdink įrankį..."
                             className="w-full bg-background border border-border rounded-xl px-4 py-2 h-20 focus:ring-2 focus:ring-accent outline-none transition-all resize-none"
@@ -154,34 +159,41 @@ export default function ToolsPage() {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {tools.map((tool) => (
-                    <a
-                        key={tool.id}
-                        href={tool.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="glass p-6 rounded-3xl space-y-4 card-hover group"
-                    >
-                        <div className="flex items-center justify-between">
-                            <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-accent group-hover:bg-accent/10 transition-colors">
-                                <LinkIcon className="w-6 h-6" />
+                {loadingTools ? (
+                    <p className="col-span-full text-center py-12 text-muted">Kraunami įrankiai...</p>
+                ) : tools.length === 0 ? (
+                    <p className="col-span-full text-center py-12 text-muted">Kol kas įrankių nėra. Būk pirmas!</p>
+                ) : (
+                    tools.map((tool) => (
+                        <a
+                            key={tool.id}
+                            href={tool.url_nuoroda}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="glass p-6 rounded-3xl space-y-4 card-hover group"
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-accent group-hover:bg-accent/10 transition-colors">
+                                    <LinkIcon className="w-6 h-6" />
+                                </div>
+                                <ExternalLink className="w-4 h-4 text-muted group-hover:text-white transition-colors" />
                             </div>
-                            <ExternalLink className="w-4 h-4 text-muted group-hover:text-white transition-colors" />
-                        </div>
-                        <div className="space-y-2">
-                            <h3 className="text-xl font-bold group-hover:text-accent transition-colors">
-                                {tool.title}
-                            </h3>
-                            <p className="text-sm text-muted leading-relaxed line-clamp-2">
-                                {tool.description || "Nėra aprašymo."}
-                            </p>
-                        </div>
-                        <div className="pt-2 text-[10px] font-mono text-muted uppercase tracking-widest truncate">
-                            {new URL(tool.url).hostname}
-                        </div>
-                    </a>
-                ))}
+                            <div className="space-y-2">
+                                <h3 className="text-xl font-bold group-hover:text-accent transition-colors">
+                                    {tool.pavadinimas}
+                                </h3>
+                                <p className="text-sm text-muted leading-relaxed line-clamp-2">
+                                    {tool.aprasymas || "Nėra aprašymo."}
+                                </p>
+                            </div>
+                            <div className="pt-2 text-[10px] font-mono text-muted uppercase tracking-widest truncate">
+                                {new URL(tool.url_nuoroda).hostname}
+                            </div>
+                        </a>
+                    ))
+                )}
             </div>
         </div>
     );
 }
+
